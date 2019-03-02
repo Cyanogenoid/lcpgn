@@ -10,6 +10,8 @@ pgn-reader = "0.13"
 flatbuffers = "0.5"
 structopt = "0.2"
 flate2 = "1.0"
+rayon = "1.0"
+indicatif = { git = 'https://github.com/willcrichton/indicatif', features = ["with_rayon"]}
 
 [build-dependencies]
 flatc-rust = "*"

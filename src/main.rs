@@ -8,7 +8,9 @@ use chunk_generated::flatlczero as flat;
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use indicatif::ParallelProgressIterator;
 use pgn_reader::{BufferedReader, RawHeader, SanPlus, Skip, Visitor};
+use rayon::prelude::*;
 use shakmaty::fen::Fen;
 use shakmaty::{
     Bitboard, Board, Chess, Color, Move, Outcome, Pieces, Position, Role, Setup, Square,
@@ -43,7 +45,8 @@ struct Chunk<'fbb> {
 
 impl<'fbb> Chunk<'fbb> {
     fn new(mut path: PathBuf) -> Chunk<'fbb> {
-        let folder_name = path.file_stem().unwrap().to_os_string();
+        let mut folder_name = path.file_stem().unwrap().to_os_string();
+        folder_name.push("-data");
         // get rid of filename
         path.pop();
         // put in directory (without extension) instead
@@ -287,14 +290,17 @@ impl<'fbb> Visitor for Chunk<'fbb> {
 fn main() -> std::io::Result<()> {
     let opt = Opt::from_args();
 
-    for filename in opt.files {
-        let file = File::open(&filename).expect("failed to open file");
-        let mut reader = BufferedReader::new(file);
+    opt.files
+        .par_iter()
+        .progress_count(opt.files.len() as u64)
+        .for_each(|filename| {
+            let file = File::open(&filename).expect("failed to open file");
+            let mut reader = BufferedReader::new(file);
 
-        let mut chunk_writer = Chunk::new(filename);
-        reader
-            .read_all(&mut chunk_writer)
-            .expect("failed to read file");
-    }
+            let mut chunk_writer = Chunk::new(filename.to_path_buf());
+            reader
+                .read_all(&mut chunk_writer)
+                .expect("failed to read file");
+        });
     Ok(())
 }
