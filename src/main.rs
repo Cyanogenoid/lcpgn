@@ -192,7 +192,7 @@ impl<'fbb> Visitor for Chunk<'fbb> {
                 Color::White => flat::Side::White,
                 Color::Black => flat::Side::Black,
             },
-            rule_50: 0,
+            rule_50: self.pos.halfmoves() as u8,
         };
         let position = flat::Position::create(&mut self.builder.borrow_mut(), &position_args);
 
