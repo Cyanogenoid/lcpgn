@@ -5,10 +5,11 @@ authors = ["Yan Zhang <cyanogenoid@cyanogenoid.com>"]
 edition = "2018"
 
 [dependencies]
-chess = "3.0"
+shakmaty = "0.13"
 pgn-reader = "0.13"
 flatbuffers = "0.5"
 structopt = "0.2"
+flate2 = "1.0"
 
 [build-dependencies]
 flatc-rust = "*"
