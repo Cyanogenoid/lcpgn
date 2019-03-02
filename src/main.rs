@@ -93,8 +93,8 @@ impl<'fbb> Chunk<'fbb> {
     }
 }
 
-fn move_to_nn_index(m: &Move, table: &[u16]) -> u16 {
-    let index = move_to_packed_int(&m);
+fn move_to_nn_index(m: &Move, mirror: bool, table: &[u16]) -> u16 {
+    let index = move_to_packed_int(&m, mirror);
     table[index as usize]
 }
 
@@ -121,16 +121,21 @@ fn build_move_table() -> Vec<u16> {
             role: Role::Pawn,
             capture: None,
         };
-        table[move_to_packed_int(&m) as usize] = i as u16;
+        table[move_to_packed_int(&m, false) as usize] = i as u16;
     }
     table
 }
 
-fn move_to_packed_int(m: &Move) -> u16 {
+fn move_to_packed_int(m: &Move, mirror: bool) -> u16 {
     // same packed int format as
     // https://github.com/LeelaChessZero/lc0/blob/9d374646c527e5575179d131c992eb9b2ddc27dc/src/chess/bitboard.cc#L314-L321
-    let from: u16 = m.from().unwrap().into();
-    let to: u16 = m.to().into();
+    let mut from: u16 = m.from().unwrap().into();
+    let mut to: u16 = m.to().into();
+    if mirror {
+        // flip the bits corresponding to row
+        from = from ^ 0b111000;
+        to = to ^ 0b111000;
+    }
     // https://github.com/LeelaChessZero/lc0/blob/9d374646c527e5575179d131c992eb9b2ddc27dc/src/chess/bitboard.h#L238
     let promotion: u16 = match m.promotion() {
         None => 0,
@@ -210,7 +215,7 @@ impl<'fbb> Visitor for Chunk<'fbb> {
         let legal_moves = self.pos.legals();
         let legal_indices: Vec<u16> = legal_moves
             .iter()
-            .map(|m| move_to_nn_index(&m, &self.move_table))
+            .map(|m| move_to_nn_index(&m, self.pos.turn() == Color::Black, &self.move_table))
             .collect();
         let policy_indices = self.builder.borrow_mut().create_vector(&legal_indices);
 
@@ -222,7 +227,7 @@ impl<'fbb> Visitor for Chunk<'fbb> {
         let probabilities: Vec<f32> = legal_moves
             .iter()
             .map(|legal| {
-                if move_to_packed_int(&legal) == move_to_packed_int(&played_move) {
+                if move_to_packed_int(&legal, false) == move_to_packed_int(&played_move, false) {
                     1.0
                 } else {
                     0.0
