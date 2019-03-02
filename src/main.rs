@@ -133,8 +133,8 @@ fn move_to_packed_int(m: &Move, mirror: bool) -> u16 {
     let mut to: u16 = m.to().into();
     if mirror {
         // flip the bits corresponding to row
-        from = from ^ 0b111000;
-        to = to ^ 0b111000;
+        from ^= 0b111_000;
+        to ^= 0b111_000;
     }
     // https://github.com/LeelaChessZero/lc0/blob/9d374646c527e5575179d131c992eb9b2ddc27dc/src/chess/bitboard.h#L238
     let promotion: u16 = match m.promotion() {
@@ -215,6 +215,7 @@ impl<'fbb> Visitor for Chunk<'fbb> {
         let legal_moves = self.pos.legals();
         let legal_indices: Vec<u16> = legal_moves
             .iter()
+            // need to mirror when black to move because policy is from side-to-move perspective
             .map(|m| move_to_nn_index(&m, self.pos.turn() == Color::Black, &self.move_table))
             .collect();
         let policy_indices = self.builder.borrow_mut().create_vector(&legal_indices);
