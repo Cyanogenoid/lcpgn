@@ -1,3 +1,4 @@
-[submodule "lczero-common"]
+[submodule "libs/lczero-common"]
 	path = libs/lczero-common
-	url = git@github.com:LeelaChessZero/lczero-common
+	url = git@github.com:Cyanogenoid/lczero-common.git
+	branch = flat-chunks
