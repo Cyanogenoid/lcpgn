@@ -1,25 +1,23 @@
-mod policy_map;
 #[allow(non_snake_case)]
 #[path = "../target/flatbuffers/chunk_generated.rs"]
 #[allow(clippy::all)]
 mod chunk_generated;
+mod policy_map;
 
 use chunk_generated::flatlczero as flat;
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
-use pgn_reader::{BufferedReader, RawHeader, SanPlus, Skip, Visitor};
-use shakmaty::fen::Fen;
-use shakmaty::{
-    Chess, Color, Move, Outcome, Pieces, Position, Role, Setup, Square,
-};
-use std::cell::RefCell;
-use std::convert::From;
-use std::fs::File;
-use std::path::PathBuf;
-use std::io::Write;
-use std::fs::create_dir_all;
-use structopt::StructOpt;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use pgn_reader::{BufferedReader, RawHeader, SanPlus, Skip, Visitor};
+use shakmaty::fen::Fen;
+use shakmaty::{Chess, Color, Move, Outcome, Pieces, Position, Role, Setup, Square};
+use std::cell::RefCell;
+use std::convert::From;
+use std::fs::create_dir_all;
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
+use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "lcpgn")]
@@ -85,7 +83,6 @@ impl<'fbb> Chunk<'fbb> {
             indices: Some(indices),
         }
     }
-
 }
 
 fn move_to_nn_index(m: &Move, table: &[u16]) -> u16 {
@@ -97,7 +94,7 @@ fn build_move_table() -> Vec<u16> {
     // map packed index to nn index
     let mut table: Vec<u16> = vec![0; 4 * 64 * 64];
     for (i, &m) in policy_map::POLICY_INDEX.iter().enumerate() {
-        let b= m.as_bytes();
+        let b = m.as_bytes();
         let from = Square::from_ascii(&b[0..2]).expect("bad policy index");
         let to = Square::from_ascii(&b[2..4]).expect("bad policy_index");
         let promotion = b.get(4);
@@ -139,9 +136,8 @@ fn move_to_packed_int(m: &Move) -> u16 {
     // bits 0..6: to square
     // bits 6..12: from square
     // bits 12..14: promotion
-    promotion * 64 * 64 & from * 64 & to
+    (promotion * 64 * 64) & (from * 64) & to
 }
-
 
 impl<'fbb> Visitor for Chunk<'fbb> {
     type Result = ();
@@ -200,32 +196,42 @@ impl<'fbb> Visitor for Chunk<'fbb> {
         let legal_moves = self.pos.legals();
         let legal_indices: Vec<u16> = legal_moves
             .iter()
-            .map(|m| { move_to_nn_index(&m, &self.move_table) })
+            .map(|m| move_to_nn_index(&m, &self.move_table))
             .collect();
         let policy_indices = self.builder.borrow_mut().create_vector(&legal_indices);
 
-        let played_move = san_plus.san.to_move(&self.pos).expect("couldn't parse move");
+        let played_move = san_plus
+            .san
+            .to_move(&self.pos)
+            .expect("couldn't parse move");
         self.pos.play_unchecked(&played_move);
         let probabilities: Vec<f32> = legal_moves
             .iter()
-            .map(|legal|
+            .map(|legal| {
                 if move_to_packed_int(&legal) == move_to_packed_int(&played_move) {
                     1.0
                 } else {
                     0.0
-                })
+                }
+            })
             .collect();
         let policy_probabilities = self.builder.borrow_mut().create_vector(&probabilities);
-        let policy = flat::Policy::create(&mut self.builder.borrow_mut(), &flat::PolicyArgs {
-            index: Some(policy_indices),
-            probability: Some(policy_probabilities),
-        });
+        let policy = flat::Policy::create(
+            &mut self.builder.borrow_mut(),
+            &flat::PolicyArgs {
+                index: Some(policy_indices),
+                probability: Some(policy_probabilities),
+            },
+        );
 
-        let state = flat::State::create(&mut self.builder.borrow_mut(), &flat::StateArgs {
-            position: Some(position),
-            policy: Some(policy),
-            evaluation: None,
-        });
+        let state = flat::State::create(
+            &mut self.builder.borrow_mut(),
+            &flat::StateArgs {
+                position: Some(position),
+                policy: Some(policy),
+                evaluation: None,
+            },
+        );
         self.states.push(state);
     }
 
@@ -249,14 +255,18 @@ impl<'fbb> Visitor for Chunk<'fbb> {
     fn end_game(&mut self) -> Self::Result {
         let states = self.builder.borrow_mut().create_vector(&self.states);
         let mut builder = self.builder.borrow_mut();
-        let game = flat::Game::create(&mut builder, &flat::GameArgs {
-            states: Some(states),
-            winner: self.result,
-        });
+        let game = flat::Game::create(
+            &mut builder,
+            &flat::GameArgs {
+                states: Some(states),
+                winner: self.result,
+            },
+        );
         builder.finish_minimal(game);
         let data = builder.finished_data();
         // write out data
-        self.path.set_file_name(format!("game_{}.gz", &self.game_id));
+        self.path
+            .set_file_name(format!("game_{}.gz", &self.game_id));
         let file = File::create(&self.path).unwrap();
         let mut encoder = GzEncoder::new(file, Compression::default());
         encoder.write_all(data).unwrap();
