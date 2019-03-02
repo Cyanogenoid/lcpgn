@@ -179,16 +179,14 @@ impl<'fbb> Visitor for Chunk<'fbb> {
     fn san(&mut self, san_plus: SanPlus) {
         // construct position
         // first, create the board position
-        let white;
-        let black;
-        {
+        let white = {
             let args = &Chunk::pieces(&self, Color::White);
-            white = flat::Pieces::create(&mut self.builder.borrow_mut(), args);
-        }
-        {
+            flat::Pieces::create(&mut self.builder.borrow_mut(), args)
+        };
+        let black = {
             let args = &Chunk::pieces(&self, Color::Black);
-            black = flat::Pieces::create(&mut self.builder.borrow_mut(), args);
-        }
+            flat::Pieces::create(&mut self.builder.borrow_mut(), args)
+        };
         let occurences = self
             .uniques
             .entry((self.pos.board().clone(), self.pos.castling_rights()))
