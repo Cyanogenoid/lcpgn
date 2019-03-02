@@ -10,8 +10,11 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use pgn_reader::{BufferedReader, RawHeader, SanPlus, Skip, Visitor};
 use shakmaty::fen::Fen;
-use shakmaty::{Chess, Color, Move, Outcome, Pieces, Position, Role, Setup, Square};
+use shakmaty::{
+    Bitboard, Board, Chess, Color, Move, Outcome, Pieces, Position, Role, Setup, Square,
+};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::convert::From;
 use std::fs::create_dir_all;
 use std::fs::File;
@@ -35,6 +38,7 @@ struct Chunk<'fbb> {
     move_table: Vec<u16>,
     game_id: i32,
     result: flat::Result,
+    uniques: HashMap<(Board, Bitboard), u8>,
 }
 
 impl<'fbb> Chunk<'fbb> {
@@ -55,6 +59,7 @@ impl<'fbb> Chunk<'fbb> {
             move_table: build_move_table(),
             game_id: -1,
             result: flat::Result::Draw,
+            uniques: HashMap::new(),
         }
     }
 
@@ -147,6 +152,7 @@ impl<'fbb> Visitor for Chunk<'fbb> {
         self.states.clear();
         self.pos = Chess::default();
         self.game_id += 1;
+        self.uniques.clear();
     }
 
     fn header(&mut self, key: &[u8], value: RawHeader<'_>) {
@@ -175,11 +181,16 @@ impl<'fbb> Visitor for Chunk<'fbb> {
             let args = &Chunk::pieces(&self, Color::Black);
             black = flat::Pieces::create(&mut self.builder.borrow_mut(), args);
         }
+        let occurences = self
+            .uniques
+            .entry((self.pos.board().clone(), self.pos.castling_rights()))
+            .or_insert(0);
+        *occurences += 1;
         let castling = self.pos.castling_rights();
         let position_args = flat::PositionArgs {
             white: Some(white),
             black: Some(black),
-            repetitions: 0, // TODO
+            repetitions: *occurences - 1,
             us_ooo: castling.contains(Square::A1),
             us_oo: castling.contains(Square::H1),
             them_ooo: castling.contains(Square::A8),
