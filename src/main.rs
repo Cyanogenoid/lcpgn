@@ -136,7 +136,7 @@ fn move_to_packed_int(m: &Move) -> u16 {
     // bits 0..6: to square
     // bits 6..12: from square
     // bits 12..14: promotion
-    (promotion * 64 * 64) & (from * 64) & to
+    (promotion * 64 * 64) | (from * 64) | to
 }
 
 impl<'fbb> Visitor for Chunk<'fbb> {
